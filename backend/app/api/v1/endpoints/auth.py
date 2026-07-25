@@ -24,6 +24,11 @@ STATE_EXPIRY_SECONDS = 600  # 10 minutes
 @router.get("/github/login")
 async def github_login() -> RedirectResponse:
     """Redirects the client browser to GitHub's OAuth authorization page."""
+    if not settings.GITHUB_CLIENT_ID or settings.GITHUB_CLIENT_ID == "your_github_client_id":
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="GITHUB_CLIENT_ID is not configured in environment variables. Please create a GitHub OAuth App on GitHub and set GITHUB_CLIENT_ID and GITHUB_CLIENT_SECRET."
+        )
     state = secrets.token_urlsafe(32)
     
     scopes = "repo read:user user:email"
