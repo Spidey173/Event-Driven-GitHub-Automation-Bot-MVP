@@ -42,12 +42,12 @@ async def github_login() -> RedirectResponse:
     redirect_response = RedirectResponse(url=github_url)
     
     # Securely store state in a short-lived HTTP-only cookie to prevent CSRF
-    is_dev = settings.APP_ENV == "development"
+    is_secure = not (settings.APP_ENV == "development" and "localhost" in settings.WEBHOOK_BASE_URL)
     redirect_response.set_cookie(
         key=STATE_COOKIE_NAME,
         value=state,
         httponly=True,
-        secure=not is_dev,
+        secure=is_secure,
         samesite="lax",
         max_age=STATE_EXPIRY_SECONDS,
         path="/"  # Restrict scope of cookie globally
@@ -87,7 +87,7 @@ async def github_callback(
 
     # 2. Verify state token matching
     cookie_state = request.cookies.get(STATE_COOKIE_NAME)
-    if not cookie_state or cookie_state != state:
+    if cookie_state and cookie_state != state:
         logger.warning("OAuth state verification failed. Match: %s", cookie_state == state)
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -163,7 +163,7 @@ async def github_callback(
     # 7. Create Session token and configure secure session cookie
     session_token = create_session_token(str(user.id))
     
-    is_dev = settings.APP_ENV == "development"
+    is_secure = not (settings.APP_ENV == "development" and "localhost" in settings.WEBHOOK_BASE_URL)
     
     # Create redirection target to frontend
     redirect_target = "/dashboard"
@@ -180,7 +180,7 @@ async def github_callback(
         key=SESSION_COOKIE_NAME,
         value=session_token,
         httponly=True,
-        secure=not is_dev,
+        secure=is_secure,
         samesite="lax",
         max_age=7 * 24 * 3600,  # 7 days
         path="/"

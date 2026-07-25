@@ -39,6 +39,8 @@ if settings.BACKEND_CORS_ORIGINS:
     )
 
 # Attach request-response performance and trace logging middleware
+from uvicorn.middleware.proxy_headers import ProxyHeadersMiddleware
+app.add_middleware(ProxyHeadersMiddleware, trusted_hosts=["*"])
 app.add_middleware(LoggingMiddleware)
 
 # Include v1 routes under '/api/v1' path prefix
