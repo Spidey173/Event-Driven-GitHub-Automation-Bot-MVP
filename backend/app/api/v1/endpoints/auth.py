@@ -165,12 +165,16 @@ async def github_callback(
     
     is_secure = not (settings.APP_ENV == "development" and "localhost" in settings.WEBHOOK_BASE_URL)
     
-    # Create redirection target to frontend
-    redirect_target = "/dashboard"
+    # Create redirection target to frontend dashboard
+    frontend_base = settings.FRONTEND_URL.strip().rstrip('/')
     if settings.BACKEND_CORS_ORIGINS:
-        first_origin = settings.BACKEND_CORS_ORIGINS[0].strip()
-        if first_origin != "*" and first_origin.startswith("http"):
-            redirect_target = f"{first_origin.rstrip('/')}/dashboard"
+        for origin in settings.BACKEND_CORS_ORIGINS:
+            cleaned = origin.strip().rstrip('/')
+            if cleaned != "*" and cleaned.startswith("http"):
+                frontend_base = cleaned
+                break
+
+    redirect_target = f"{frontend_base}/dashboard"
 
     redirect_response = RedirectResponse(url=redirect_target)
     

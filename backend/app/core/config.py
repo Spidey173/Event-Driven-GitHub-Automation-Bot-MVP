@@ -60,5 +60,6 @@ class Settings(BaseSettings):
     
     # Webhook callback configuration base
     WEBHOOK_BASE_URL: str = "http://localhost:8000"
+    FRONTEND_URL: str = "http://localhost:3000"
 
 settings = Settings(_env_file=".env")
