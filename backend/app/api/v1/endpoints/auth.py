@@ -21,14 +21,63 @@ STATE_COOKIE_NAME = "oauth_state"
 SESSION_COOKIE_NAME = "session_token"
 STATE_EXPIRY_SECONDS = 600  # 10 minutes
 
+@router.get("/github/demo-login")
+async def demo_login(
+    response: Response,
+    db: AsyncSession = Depends(get_db)
+) -> RedirectResponse:
+    """Provides instant 1-click guest login for testing without requiring GitHub OAuth keys."""
+    demo_github_id = 99999999
+    demo_username = "demo_developer"
+    demo_email = "demo@automationbot.dev"
+    demo_avatar = "https://avatars.githubusercontent.com/u/99999999"
+
+    result = await db.execute(select(User).where(User.github_user_id == demo_github_id))
+    user = result.scalar_one_or_none()
+
+    now = datetime.now(timezone.utc)
+    if not user:
+        user = User(
+            github_user_id=demo_github_id,
+            github_username=demo_username,
+            email=demo_email,
+            avatar_url=demo_avatar,
+            github_access_token_encrypted=encrypt_token("demo_token"),
+            last_login_at=now,
+        )
+        db.add(user)
+    else:
+        user.last_login_at = now
+
+    await db.commit()
+    await db.refresh(user)
+
+    session_token = create_session_token(str(user.id))
+    is_dev = settings.APP_ENV == "development"
+    
+    redirect_target = "/dashboard"
+    if settings.BACKEND_CORS_ORIGINS and settings.BACKEND_CORS_ORIGINS[0] != "*":
+        redirect_target = f"{settings.BACKEND_CORS_ORIGINS[0]}/dashboard"
+
+    redirect_response = RedirectResponse(url=redirect_target)
+    redirect_response.set_cookie(
+        key=SESSION_COOKIE_NAME,
+        value=session_token,
+        httponly=True,
+        secure=not is_dev,
+        samesite="lax",
+        max_age=7 * 24 * 3600,
+        path="/"
+    )
+    return redirect_response
+
 @router.get("/github/login")
 async def github_login() -> RedirectResponse:
-    """Redirects the client browser to GitHub's OAuth authorization page."""
+    """Redirects the client browser to GitHub's OAuth authorization page (or demo login if unconfigured)."""
     if not settings.GITHUB_CLIENT_ID or settings.GITHUB_CLIENT_ID == "your_github_client_id":
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="GITHUB_CLIENT_ID is not configured in environment variables. Please create a GitHub OAuth App on GitHub and set GITHUB_CLIENT_ID and GITHUB_CLIENT_SECRET."
-        )
+        logger.info("GITHUB_CLIENT_ID not set. Redirecting to instant demo login.")
+        return RedirectResponse(url="/api/v1/auth/github/demo-login")
+
     state = secrets.token_urlsafe(32)
     
     scopes = "repo read:user user:email"
