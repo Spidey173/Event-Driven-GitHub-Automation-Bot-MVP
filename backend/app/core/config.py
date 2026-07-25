@@ -16,12 +16,17 @@ def parse_cors(v: Union[str, List[str]]) -> List[str]:
     return v
 
 def normalize_db_url(v: str) -> str:
-    """Helper to convert postgresql:// or postgres:// scheme to postgresql+asyncpg:// for SQLAlchemy async driver."""
+    """Helper to convert postgresql:// or postgres:// scheme to postgresql+asyncpg:// and normalize SSL params for asyncpg."""
     if isinstance(v, str):
         if v.startswith("postgresql://"):
-            return v.replace("postgresql://", "postgresql+asyncpg://", 1)
+            v = v.replace("postgresql://", "postgresql+asyncpg://", 1)
         elif v.startswith("postgres://"):
-            return v.replace("postgres://", "postgresql+asyncpg://", 1)
+            v = v.replace("postgres://", "postgresql+asyncpg://", 1)
+        
+        if "asyncpg" in v:
+            v = v.replace("sslmode=", "ssl=")
+            import re
+            v = re.sub(r'[&?]channel_binding=[^&]*', '', v)
     return v
 
 class Settings(BaseSettings):
