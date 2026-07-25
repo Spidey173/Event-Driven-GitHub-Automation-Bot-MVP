@@ -1,0 +1,60 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: github_bot_db
+    restart: always
+    environment:
+      POSTGRES_USER: bot_user
+      POSTGRES_PASSWORD: bot_password
+      POSTGRES_DB: github_bot_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U bot_user -d github_bot_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: github_bot_backend
+    restart: always
+    environment:
+      APP_NAME: "GitHub Automation Bot"
+      APP_ENV: "production"
+      DEBUG: "false"
+      DATABASE_URL: "postgresql+asyncpg://bot_user:bot_password@postgres:5432/github_bot_db"
+      SECRET_KEY: "${SECRET_KEY:-change_this_jwt_secret_key_in_production}"
+      ENCRYPTION_KEY: "${ENCRYPTION_KEY:-change_this_fernet_key_in_production}"
+      GITHUB_CLIENT_ID: "${GITHUB_CLIENT_ID}"
+      GITHUB_CLIENT_SECRET: "${GITHUB_CLIENT_SECRET}"
+      GITHUB_WEBHOOK_SECRET: "${GITHUB_WEBHOOK_SECRET}"
+      WEBHOOK_BASE_URL: "${WEBHOOK_BASE_URL:-http://localhost:8000}"
+      BACKEND_CORS_ORIGINS: '["http://localhost:3000","http://frontend:3000"]'
+    ports:
+      - "8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: github_bot_frontend
+    restart: always
+    environment:
+      BACKEND_URL: "http://backend:8000"
+    ports:
+      - "3000:3000"
+    depends_on:
+      - backend
+
+volumes:
+  postgres_data:
