@@ -44,6 +44,10 @@ app.add_middleware(LoggingMiddleware)
 # Include v1 routes under '/api/v1' path prefix
 app.include_router(api_router, prefix="/api/v1")
 
+@app.api_route("/", methods=["GET", "HEAD"])
+async def root():
+    return {"status": "healthy", "service": settings.APP_NAME, "docs": "/docs"}
+
 @app.exception_handler(StarletteHTTPException)
 async def http_exception_handler(request: Request, exc: StarletteHTTPException) -> JSONResponse:
     """Interceptors custom exception responses for HTTP exceptions."""
